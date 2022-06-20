@@ -2,10 +2,12 @@ import os
 import pickle
 import re
 from typing import List
-import nltk
 
-from definitions import ROOT_DIR
+import nltk
+import torch
 from tokenizers import BertWordPieceTokenizer
+
+from definitions import ROOT_DIR, VOCAB_SIZE
 
 pattern = re.compile("^Page \\| .*")
 
@@ -84,7 +86,7 @@ def get_subword_tokenizer(tokenized_corpus, save=False):
 
         subword_tokenizer.train(
             files,
-            vocab_size=10000,
+            vocab_size=VOCAB_SIZE,
             min_frequency=2,
             show_progress=True,
             special_tokens=['[PAD]', '[UNK]', '[CLS]', '[SEP]', '[MASK]'],
@@ -119,7 +121,25 @@ def preprocessing_pipeline(save=False):
     subword_tokenizer = get_subword_tokenizer(tokenized_corpus, save)
     tokenized_sentences = get_tokenized_sentences(subword_tokenizer, sentences_in_corpus)
 
-    return tokenized_sentences
+    return tokenized_sentences, subword_tokenizer
+
+
+class Dataset(torch.utils.data.Dataset):
+    def __init__(
+            self,
+    ):
+        self.sentences, self.tokenizer = preprocessing_pipeline()
+        self.uniq_words = VOCAB_SIZE
+        self.seq_size = max([len(token.ids) for token in self.sentences])
+
+    def __len__(self):
+        return len(self.sentences)
+
+    def __getitem__(self, index):
+        return (
+            torch.tensor(self.sentences[index].ids[:-1] + [0] * (self.seq_size - len(self.sentences[index].ids[:-1]))),
+            torch.tensor(self.sentences[index].ids[1:] + [0] * (self.seq_size - len(self.sentences[index].ids[:-1]))),
+        )
 
 
 if __name__ == "__main__":
