@@ -7,10 +7,10 @@ import nltk
 import torch
 from tokenizers import BertWordPieceTokenizer
 
-from definitions import ROOT_DIR, VOCAB_SIZE
+from definitions import ROOT_DIR, VOCAB_SIZE, SEQ_SIZE
 
 pattern = re.compile("^Page \\| .*")
-
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def verify_line(line: str):
     if len(line) < 2:
@@ -103,7 +103,7 @@ def get_tokenized_sentences(subword_tokenizer, sentences_in_corpus, save=False):
         with open(tokenized_sentences_path, 'rb') as preprocessed_file:
             return pickle.load(preprocessed_file)
     except FileNotFoundError:
-        tokenized_sentences = [subword_tokenizer.encode(sentence) for sentence in sentences_in_corpus]
+        tokenized_sentences = subword_tokenizer.encode("".join(sentences_in_corpus))
         if save:
             with open(tokenized_sentences_path, 'wb') as result_file:
                 pickle.dump(tokenized_sentences, result_file)
@@ -130,15 +130,15 @@ class Dataset(torch.utils.data.Dataset):
     ):
         self.sentences, self.tokenizer = preprocessing_pipeline()
         self.uniq_words = VOCAB_SIZE
-        self.seq_size = max([len(token.ids) for token in self.sentences])
+        self.seq_size = SEQ_SIZE
 
     def __len__(self):
         return len(self.sentences)
 
     def __getitem__(self, index):
         return (
-            torch.tensor(self.sentences[index].ids[:-1] + [0] * (self.seq_size - len(self.sentences[index].ids[:-1]))),
-            torch.tensor(self.sentences[index].ids[1:] + [0] * (self.seq_size - len(self.sentences[index].ids[:-1]))),
+            torch.tensor(self.sentences.ids[index:index+self.seq_size], device=device),
+            torch.tensor(self.sentences.ids[index+1:index+self.seq_size+1], device=device)
         )
 
 
