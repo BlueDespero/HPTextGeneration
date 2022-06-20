@@ -12,6 +12,7 @@ from definitions import ROOT_DIR, VOCAB_SIZE, SEQ_SIZE
 pattern = re.compile("^Page \\| .*")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+
 def verify_line(line: str):
     if len(line) < 2:
         return False
@@ -132,13 +133,21 @@ class Dataset(torch.utils.data.Dataset):
         self.uniq_words = VOCAB_SIZE
         self.seq_size = SEQ_SIZE
 
+    def get_batch(self, idx, batch_size):
+        subset = self.sentences.ids[idx: min(idx + batch_size + self.seq_size + 1, len(self.sentences) - 1)]
+        x, y = [], []
+        for i in range(batch_size):
+            x.append(torch.tensor(subset[i:i+self.seq_size], device=device))
+            y.append(torch.tensor(subset[i+1:i+self.seq_size+1], device=device))
+        return torch.stack(x, dim=0), torch.stack(y, dim=0)
+
     def __len__(self):
         return len(self.sentences)
 
     def __getitem__(self, index):
         return (
-            torch.tensor(self.sentences.ids[index:index+self.seq_size], device=device),
-            torch.tensor(self.sentences.ids[index+1:index+self.seq_size+1], device=device)
+            torch.tensor(self.sentences.ids[index:index + self.seq_size], device=device),
+            torch.tensor(self.sentences.ids[index + 1:index + self.seq_size + 1], device=device)
         )
 
 

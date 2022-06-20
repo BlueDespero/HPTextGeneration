@@ -5,13 +5,15 @@ from torch.utils.data import DataLoader
 
 from word_tokenization import Dataset
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 
 class Model(nn.Module):
     def __init__(self, dataset):
         super(Model, self).__init__()
-        self.lstm_size = 128
-        self.embedding_dim = 128
-        self.num_layers = 3
+        self.lstm_size = 50
+        self.embedding_dim = 15
+        self.num_layers = 2
 
         n_vocab = dataset.uniq_words
         self.embedding = nn.Embedding(
@@ -19,7 +21,7 @@ class Model(nn.Module):
             embedding_dim=self.embedding_dim,
         )
         self.lstm = nn.LSTM(
-            input_size=self.lstm_size,
+            input_size=15,
             hidden_size=self.lstm_size,
             num_layers=self.num_layers,
             dropout=0.2,
@@ -47,7 +49,8 @@ def train(dataset: Dataset, model, batch_size, max_epochs):
     for epoch in range(max_epochs):
         state_h, state_c = model.init_state(dataset.seq_size)
 
-        for batch, (x, y) in enumerate(dataloader):
+        for batch, i in enumerate(range(0, len(dataset), batch_size)):
+            x, y = dataset.get_batch(i, batch_size)
             optimizer.zero_grad()
 
             y_pred, (state_h, state_c) = model(x, (state_h, state_c))
@@ -120,6 +123,7 @@ max_epochs = 32
 
 dataset = Dataset()
 model = Model(dataset)
+model.to(device)
 
 train(dataset, model, batch_size, max_epochs)
 print(predict(dataset, model, text='Wand was risen'))
