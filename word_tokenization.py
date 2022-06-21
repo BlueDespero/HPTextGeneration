@@ -134,12 +134,15 @@ class Dataset(torch.utils.data.Dataset):
         self.seq_size = SEQ_SIZE
 
     def get_batch(self, idx, batch_size):
-        subset = self.sentences.ids[idx: min(idx + batch_size + self.seq_size + 1, len(self.sentences) - 1)]
-        x, y = [], []
-        for i in range(batch_size):
-            x.append(torch.tensor(subset[i:i+self.seq_size], device=device))
-            y.append(torch.tensor(subset[i+1:i+self.seq_size+1], device=device))
-        return torch.stack(x, dim=0), torch.stack(y, dim=0)
+        try:
+            subset = self.sentences.ids[idx: min(idx + batch_size + self.seq_size + 1, len(self.sentences) - 1)]
+            x, y = [], []
+            for i in range(batch_size):
+                x.append(torch.tensor(subset[i:i+self.seq_size], device=device))
+                y.append(torch.tensor(subset[i+1:i+self.seq_size+1], device=device))
+            return torch.stack(x, dim=0), torch.stack(y, dim=0)
+        except:
+            return -1, -1
 
     def __len__(self):
         return len(self.sentences)
