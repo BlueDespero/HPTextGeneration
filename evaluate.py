@@ -66,15 +66,13 @@ def predict(dataset, model, text, next_words=100, init_patience=5, unbounded=Fal
         if not unbounded:
             if not verify_text(text, dataset):
                 patience -= 1
-            else:
+            elif text[-1] not in string.punctuation:
                 patience = init_patience
-                if text[-1] not in string.punctuation:
-                    checkpoint = (text, state_h, state_c)
+                checkpoint = (text, state_h, state_c)
 
             if patience <= 0 and patience % 5 == 0:
                 text, state_h, state_c = checkpoint
-                patience = init_patience
-            if patience == -100:
+            if patience <= -1000:
                 text = init_text
                 state_h, state_c = model.init_state(attention_size)
                 patience = init_patience
@@ -96,7 +94,7 @@ if __name__ == "__main__":
     dataset = Dataset()
     model = Model(dataset)
     model.load_state_dict(torch.load(os.path.join(ROOT_DIR, "data_processed/model_finished")))
-    print(predict(dataset, model, text='Harry had'))
+    print(predict(dataset, model, text='Harry had', unbounded=True))
     print(predict(dataset, model, text='Hagrid looked at his house'))
     print(predict(dataset, model, text='Snape did'))
     print(predict(dataset, model, text='Nicolas Flamel'))
