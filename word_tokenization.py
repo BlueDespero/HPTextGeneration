@@ -5,6 +5,7 @@ from typing import List
 
 import nltk
 import torch
+from nltk import RegexpTokenizer
 from tokenizers import BertWordPieceTokenizer
 
 from definitions import ROOT_DIR, VOCAB_SIZE, SEQ_SIZE
@@ -30,7 +31,7 @@ def load_corpus() -> List[str]:
     for file in os.listdir(path_to_data):
         path_to_file = os.path.join(path_to_data, file)
         with open(path_to_file, 'r', encoding='utf-8') as book:
-            content += [line for line in book.readlines() if verify_line(line)]
+            content += [line.strip() for line in book.readlines() if verify_line(line)]
 
     return content
 
@@ -41,7 +42,7 @@ def check_number_of_words_in_corpus(corpus: List[str]):
 
 def prepare_nltk():
     try:
-        nltk.data.find('tokenizers/punkt.zip')
+        nltk.data.find('punkt')
     except LookupError:
         nltk.download('punkt')
 
@@ -72,7 +73,7 @@ def get_corpus_of_sentences(text, save=False):
         return sentences_in_corpus
 
 
-def get_subword_tokenizer(tokenized_corpus, save=False):
+def get_subword_tokenizer():
     try:
         return BertWordPieceTokenizer(os.path.join(ROOT_DIR, "data_processed", "bert-vocab.txt"))
     except Exception:
@@ -119,18 +120,23 @@ def preprocessing_pipeline(save=False):
     tokenized_corpus = get_tokenized_corpus(full_text, save)
     sentences_in_corpus = get_corpus_of_sentences(full_text, save)
 
-    subword_tokenizer = get_subword_tokenizer(tokenized_corpus, save)
+    tokenizer = RegexpTokenizer(r'\w+')
+    bigram_words = tokenizer.tokenize(full_text)
+    bigrams = [(b[0].lower(), b[1].lower()) for b in zip(bigram_words[:-1], bigram_words[1:])]
+
+    subword_tokenizer = get_subword_tokenizer()
     tokenized_sentences = get_tokenized_sentences(subword_tokenizer, sentences_in_corpus)
 
-    return tokenized_sentences, subword_tokenizer
+    return tokenized_sentences, subword_tokenizer, set(tokenized_corpus), bigrams
 
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(
             self,
     ):
-        self.sentences, self.tokenizer = preprocessing_pipeline()
-        self.uniq_words = VOCAB_SIZE
+        self.sentences, self.tokenizer, self.unique_words, self.bigrams = preprocessing_pipeline()
+        self.unique_words = set([word.lower() for word in self.unique_words])
+        self.n_tokens = VOCAB_SIZE
         self.seq_size = SEQ_SIZE
 
     def get_batch(self, idx, batch_size):
@@ -138,8 +144,8 @@ class Dataset(torch.utils.data.Dataset):
             subset = self.sentences.ids[idx: min(idx + batch_size + self.seq_size + 1, len(self.sentences) - 1)]
             x, y = [], []
             for i in range(batch_size):
-                x.append(torch.tensor(subset[i:i+self.seq_size], device=device))
-                y.append(torch.tensor(subset[i+1:i+self.seq_size+1], device=device))
+                x.append(torch.tensor(subset[i:i + self.seq_size], device=device))
+                y.append(torch.tensor(subset[i + 1:i + self.seq_size + 1], device=device))
             return torch.stack(x, dim=0), torch.stack(y, dim=0)
         except:
             return -1, -1
